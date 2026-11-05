@@ -1841,11 +1841,11 @@ export default function App() {
     yardPet?: THREE.Object3D;
     [key: string]: any;
   }>;
-  nightLights: THREE.Object3D[];
-  ambientLight: THREE.Light | null;
-  sunLight: THREE.Light | null;
-  skyParticles: THREE.Object3D | null;
-  fireflies: THREE.Object3D | null;
+  nightLights: THREE.PointLight[];
+  ambientLight: THREE.AmbientLight | null;
+  sunLight: THREE.DirectionalLight | null;
+  skyParticles: THREE.Points | null;
+  fireflies: THREE.Points | null;
   localCharMesh: THREE.Group | null;
   localPetMesh: THREE.Group | null;
 }>({
@@ -2538,13 +2538,13 @@ export default function App() {
       // Animate Falling Petals / Weather Particles
       const sParts = sceneObjectsRef.current.skyParticles;
       if (sParts) {
-        const posArr = sParts.geometry.attributes.position.array;
+        const posArr = (sParts as THREE.Points).geometry.attributes.position.array;
         for (let i = 0; i < pCount; i++) {
           posArr[i * 3 + 1] -= 0.06;
           posArr[i * 3] += Math.sin(elapsed + i) * 0.02;
           if (posArr[i * 3 + 1] < 0) posArr[i * 3 + 1] = 34;
         }
-        sParts.geometry.attributes.position.needsUpdate = true;
+        (sParts as THREE.Points).geometry.attributes.position.needsUpdate = true;
       }
 
       // Animate Yard Pets roaming in the 4 plots
@@ -2650,7 +2650,7 @@ export default function App() {
       sunLight.intensity = 0.22;
       sunLight.color.setHex(0x90CAF9);
       nightLights.forEach(l => { l.intensity = 1.65; });
-      if (fireflies) fireflies.material.opacity = 0.95;
+      if (fireflies) (fireflies.material as THREE.PointsMaterial).opacity = 0.95;
     } else {
       const skyHex = weather === 'rain' ? 0x90A4AE : weather === 'autumn' ? 0xFFE0B2 : 0xBDE0FE;
       scene.background = new THREE.Color(skyHex);
@@ -2659,26 +2659,31 @@ export default function App() {
       sunLight.intensity = 1.1;
       sunLight.color.setHex(0xFFF3E0);
       nightLights.forEach(l => { l.intensity = 0; });
-      if (fireflies) fireflies.material.opacity = 0;
+      if (fireflies) (fireflies.material as THREE.PointsMaterial).opacity = 0;
     }
 
     if (skyParticles) {
       if (weather === 'rain') {
-        skyParticles.material.color.setHex(0x81D4FA);
-        skyParticles.material.size = 0.35;
+        (skyParticles.material as THREE.PointsMaterial).color.setHex(0x81D4FA);
+        (skyParticles.material as THREE.PointsMaterial).size = 0.35;
       } else if (weather === 'autumn') {
-        skyParticles.material.color.setHex(0xFFB74D);
-        skyParticles.material.size = 0.65;
+        (skyParticles.material as THREE.PointsMaterial).color.setHex(0xFFB74D);
+        (skyParticles.material as THREE.PointsMaterial).size = 0.65;
       } else {
-        skyParticles.material.color.setHex(0xFFB3C6);
-        skyParticles.material.size = 0.55;
+        (skyParticles.material as THREE.PointsMaterial).color.setHex(0xFFB3C6);
+        (skyParticles.material as THREE.PointsMaterial).size = 0.55;
       }
     }
   }, [isNight, weather, screen]);
 
   // Dynamically Sync Other Real Online Players (Max 4 per room) into the 3D Scene
   useEffect(() => {
-    const { scene, remotePlayerMeshes } = sceneObjectsRef.current;
+    const scene = sceneObjectsRef.current.scene;
+const remotePlayerMeshes = sceneObjectsRef.current.remotePlayerMeshes as Record<string, {
+  charGroup: THREE.Group;
+  petGroup: THREE.Group;
+  meshKey: string;
+}>;
     if (!scene || screen !== 'world' || !user) return;
 
     const activeIds = new Set();
@@ -2747,7 +2752,7 @@ export default function App() {
           const seedKey = bedState?.seedId ? `${bedState.seedId}_stage_${stage}` : 'empty';
 
           // Visual wet soil color
-          bedObj.soilBox.material.color.setHex(bedState?.watered ? 0x3E2723 : 0x6D4C41);
+          (bedObj.soilBox.material as THREE.MeshStandardMaterial).color.setHex(bedState?.watered ? 0x3E2723 : 0x6D4C41);
 
           if (bedObj.currentKey !== seedKey) {
             bedObj.plantHolder.clear();
@@ -2825,7 +2830,7 @@ export default function App() {
     const plotId = `plot_${plotIdx}`;
     const existingPlot = plotsData[plotId];
     if (!existingPlot) return;
-    const beds = [...(existingPlot.beds || [])];
+    const beds: Array<any> = [...((existingPlot.beds || []) as Array<any>)];
     if (!beds[bedIdx] || !beds[bedIdx].seedId) return;
 
     if (actionType === 'water') {
@@ -2851,7 +2856,7 @@ export default function App() {
     const plotId = `plot_${plotIdx}`;
     const existingPlot = plotsData[plotId];
     if (!existingPlot) return;
-    const beds = [...((existingPlot.beds || []) as Array<any>)];
+    const beds: Array<any> = [...((existingPlot.beds || []) as Array<any>)];
     const targetBed = beds[bedIdx];
     if (!targetBed || getBedGrowthStage(targetBed) < 6) {
       showToast('Cây chưa đến giai đoạn thu hoạch (Giai đoạn 6/6)!', '⏳');
