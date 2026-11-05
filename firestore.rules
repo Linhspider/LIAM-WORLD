@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    match /artifacts/liam-world/users/{userId}/profile/{profileId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+    match /artifacts/liam-world/public/data/{collectionName}/{documentId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.keys().hasAll(['updatedAt'])
+        || (signedIn() && collectionName.matches('room_.*_chat') && request.resource.data.keys().hasAll(['uid', 'sender', 'text', 'createdAt']) && request.resource.data.uid == request.auth.uid);
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+  }
+}
