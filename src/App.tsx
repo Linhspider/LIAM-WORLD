@@ -1179,6 +1179,41 @@ function createVietnameseHouseMesh(styleId) {
 // ==========================================
 // 4. MAIN APPLICATION COMPONENT
 // ==========================================
+interface PlayerData {
+  uid: string;
+  name: string;
+  x: number;
+  y?: number;
+  z: number;
+  rotY?: number;
+  anim?: string;
+  zodiac?: string;
+  outfit?: string;
+  pet?: string;
+  petName?: string;
+  plotIndex?: number;
+  distance?: number;
+  [key: string]: unknown;
+}
+
+interface PlotData {
+  ownerId?: string;
+  ownerName?: string;
+  houseStyle?: string;
+  protected?: boolean;
+  homePets?: string[];
+  beds?: unknown[];
+  [key: string]: unknown;
+}
+
+interface RemotePlayerEntry {
+  charGroup: THREE.Group;
+  petGroup?: THREE.Group | null;
+}
+
+interface PlotSceneEntry {
+  yardPet?: THREE.Group | null;
+}
 export default function App() {
   // Authentication & Room States
   const [user, setUser] = useState(null);
@@ -1224,8 +1259,7 @@ export default function App() {
   const chatInputDomRef = useRef(null);
 
   // Multiplayer & Real-Time Firestore States
-  const [onlinePlayers, setOnlinePlayers] = useState({});
-  const [plotsData, setPlotsData] = useState({});
+  const [onlinePlayers, setOnlinePlayers] = useState<Record<string, PlayerData>>({});  const [plotsData, setPlotsData] = useState<Record<string, PlotData>>({});
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
 
@@ -1254,7 +1288,7 @@ export default function App() {
   const worldMountRef = useRef(null);
   const turntableMountRef = useRef(null);
   const playerPosRef = useRef({ x: 0, y: 0, z: 12, rotY: 0, anim: 'idle' });
-  const onlinePlayersRef = useRef({});
+  const onlinePlayersRef = useRef<Record<string, any>>({});
   const keysPressedRef = useRef({});
   const joystickRef = useRef({ active: false, dx: 0, dy: 0 });
   const cameraOrbitRef = useRef({ theta: 0, phi: 0.42, distance: 11.5 });
@@ -1410,11 +1444,7 @@ export default function App() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
       } catch (err) {
         console.error('Auth error:', err);
       }
@@ -1800,18 +1830,36 @@ export default function App() {
   // ==========================================
   // 7. MAIN 3D OPEN WORLD ENGINE (THREE.JS)
   // ==========================================
-  const sceneObjectsRef = useRef({
-    scene: null,
-    remotePlayerMeshes: {},
-    plotGroups: {},
-    nightLights: [],
-    ambientLight: null,
-    sunLight: null,
-    skyParticles: null,
-    fireflies: null,
-    localCharMesh: null,
-    localPetMesh: null
-  });
+  const sceneObjectsRef = useRef<{
+  scene: THREE.Scene | null;
+  remotePlayerMeshes: Record<string, {
+    charGroup: THREE.Group;
+    petGroup: THREE.Group;
+    meshKey: string;
+  }>;
+  plotGroups: Record<string, {
+    yardPet?: THREE.Object3D;
+    [key: string]: any;
+  }>;
+  nightLights: THREE.Object3D[];
+  ambientLight: THREE.Light | null;
+  sunLight: THREE.Light | null;
+  skyParticles: THREE.Object3D | null;
+  fireflies: THREE.Object3D | null;
+  localCharMesh: THREE.Group | null;
+  localPetMesh: THREE.Group | null;
+}>({
+  scene: null,
+  remotePlayerMeshes: {},
+  plotGroups: {},
+  nightLights: [],
+  ambientLight: null,
+  sunLight: null,
+  skyParticles: null,
+  fireflies: null,
+  localCharMesh: null,
+  localPetMesh: null
+});
 
   useEffect(() => {
     if (screen !== 'world' || !worldMountRef.current) return;
@@ -2262,7 +2310,7 @@ export default function App() {
     // 9. KEYBOARD & MOUSE CAMERA CONTROLS
     const onKeyDown = (e) => {
       if (document.activeElement?.tagName === 'INPUT') {
-        if (e.code === 'Escape') document.activeElement.blur();
+        if (e.code === 'Escape') (document.activeElement as HTMLElement)?.blur();
         return;
       }
       const code = e.code;
@@ -2371,7 +2419,7 @@ export default function App() {
       }
 
       // Smoothly Interpolate & Animate All Remote Online Players in the Room
-      Object.entries(sceneObjectsRef.current.remotePlayerMeshes).forEach(([uid, rEntry]) => {
+      Object.entries(sceneObjectsRef.current.remotePlayerMeshes as Record<string, { charGroup: THREE.Group; petGroup: THREE.Group; meshKey: string }>).forEach(([uid, rEntry]) => {
         const pData = onlinePlayersRef.current[uid];
         if (!pData || !rEntry.charGroup) return;
 
@@ -2459,7 +2507,7 @@ export default function App() {
         const h = container.clientHeight;
         const tags = [];
 
-        Object.entries(sceneObjectsRef.current.remotePlayerMeshes).forEach(([uid, rEntry]) => {
+        Object.entries(sceneObjectsRef.current.remotePlayerMeshes as Record<string, { charGroup: THREE.Group; petGroup: THREE.Group; meshKey: string }>).forEach(([uid, rEntry]) => {
           const pData = onlinePlayersRef.current[uid];
           if (!pData || !rEntry.charGroup) return;
           const worldVec = new THREE.Vector3(
@@ -2500,7 +2548,7 @@ export default function App() {
       }
 
       // Animate Yard Pets roaming in the 4 plots
-      Object.values(sceneObjectsRef.current.plotGroups).forEach((pg, idx) => {
+      Object.values(sceneObjectsRef.current.plotGroups as Record<string, { yardPet?: THREE.Object3D }>).forEach((pg, idx) => {
         if (pg.yardPet) {
           pg.yardPet.position.x = 6.0 + Math.cos(elapsed * 1.4 + idx) * 2.2;
           pg.yardPet.position.z = 3.0 + Math.sin(elapsed * 1.4 + idx) * 2.2;
@@ -2691,7 +2739,8 @@ export default function App() {
         }
 
         // Update 8 Soil Beds & 6 Growth Stages
-        const beds = pData.beds || [];
+                 const beds = (pData.beds || []) as Array<any>;
+
         pGroupObj.bedMeshes.forEach((bedObj, idx) => {
           const bedState = beds[idx];
           const stage = getBedGrowthStage(bedState);
@@ -2802,7 +2851,7 @@ export default function App() {
     const plotId = `plot_${plotIdx}`;
     const existingPlot = plotsData[plotId];
     if (!existingPlot) return;
-    const beds = [...(existingPlot.beds || [])];
+    const beds = [...((existingPlot.beds || []) as Array<any>)];
     const targetBed = beds[bedIdx];
     if (!targetBed || getBedGrowthStage(targetBed) < 6) {
       showToast('Cây chưa đến giai đoạn thu hoạch (Giai đoạn 6/6)!', '⏳');
@@ -4284,7 +4333,18 @@ export default function App() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {Array.from({ length: 8 }, (_, idx) => {
-                  const bed = (currentPlotObj.beds || [])[idx] || {};
+                  const bed = ((currentPlotObj.beds || []) as Array<{
+                      bedIndex?: number;
+                      seedId: string | null;
+                     plantedAt: number;
+                     watered: boolean;
+                     fertilized: boolean;
+}>)[idx] || {
+  seedId: null,
+  plantedAt: 0,
+  watered: false,
+  fertilized: false
+};
                   const stage = getBedGrowthStage(bed);
                   const seedObj = SEEDS_DATA.find(s => s.id === bed.seedId);
                   const stageNames = [
